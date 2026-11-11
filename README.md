@@ -13,6 +13,60 @@ The implementation covers:
 - Equal-power neighboring-span crossfades.
 - Peak normalization into a requested dBFS target.
 - Durable render states, receipts, and atomically committed output folders.
+- Project ownership and role-based membership with default cross-project
+  isolation.
+- Read-only cross-project source grants, terminal revocation, and a
+  publication gate that never releases an artifact whose authorization was
+  withdrawn.
+- A legacy adoption path that gives pre-isolation data explicit ownership and
+  backfills historical render receipts.
+
+## Project isolation and authorization model
+
+Every source, timeline, and render belongs to exactly one project. Requests
+carry the authenticated identity the deployment's fronting proxy establishes:
+
+- `X-Project-Id`: the project in whose scope the request runs.
+- `X-Actor-Id`: the acting member inside that project.
+
+Membership roles are `owner`, `editor`, and `viewer`. Editors and above create
+sources, timelines, and renders; owners additionally manage memberships and
+issue or revoke grants. A viewer may read project resources but not write.
+
+### Cross-project source grants
+
+A project that owns a source may grant another project read-only use of it.
+The grantee can read the source and place it inside its own timelines and
+renders, but can never modify the source or its measured facts; the owning
+project remains the sole authority over them.
+
+Each timeline stores a permission snapshot (`source_authorizations`) captured
+at composition time. Rendering re-resolves every source through the same
+authorization guard and re-verifies the snapshots immediately before
+publishing artifacts:
+
+- If a grant is revoked before the render starts, the source is no longer
+  readable and the render fails without creating artifacts.
+- If revocation meets an in-progress render, the publication gate rejects the
+  job (`authorization_revoked`) and no output or receipt is released.
+- A render completed while the grant was active stays readable, and its
+  receipt continues to explain the basis that was legal at that time.
+
+### No existence disclosure
+
+Cross-project reads use the same `*_not_found` responses as genuinely missing
+objects. An unauthorized project cannot distinguish "the object exists in
+another project" from "the object does not exist". Output and receipt
+downloads are project-scoped through the owning render job.
+
+### Legacy data adoption
+
+Records written before multi-project isolation carry no project ownership and
+are invisible to every project until explicitly adopted. An owner can list the
+unowned records and adopt them into their project in one durable pass. Adoption
+stamps ownership on sources, timelines, and jobs, writes an adoption manifest,
+and backfills completed render receipts so historical legal use remains
+explainable. Already-owned objects are never reassigned.
 
 Automated tests are intentionally deferred. A later task stage will add unit,
 integration, and end-to-end verification around the production interfaces.
@@ -50,6 +104,20 @@ No environment variable is required. Do not put credentials in the repository;
 the service does not consume any remote credential.
 
 ## HTTP interface
+
+All project-scoped requests require the `X-Project-Id` and `X-Actor-Id`
+identity headers. Project and membership provisioning, grants, and legacy
+adoption are available alongside the media workflows:
+
+- `PUT /v1/projects/{project_id}` — provision a project with a founding owner.
+- `GET /v1/projects` — list projects in which the actor is a member.
+- `PUT /v1/memberships` — owner-only add or update a member role.
+- `GET /v1/memberships/self` — read the caller's own role.
+- `PUT /v1/grants` — owner-only issue a read-only source grant.
+- `GET /v1/grants` and `GET /v1/grants/{grant_id}` — list or read visible grants.
+- `POST /v1/grants/{grant_id}/revoke` — owner-only terminal revocation.
+- `GET /v1/legacy` — owner-only list of unowned pre-isolation records.
+- `POST /v1/legacy/adopt` — owner-only adoption into the caller's project.
 
 ### Register a source
 
@@ -150,14 +218,17 @@ gain, output digest, and non-fatal warnings.
 
 ```text
 var/voice-timeline/
+  projects/<project_id>.json     # project record with its member list
+  grants/registry.json           # all cross-project grants and revocation state
   sources/<source_id>/
     source.wav
-    metadata.json
-  timelines/<timeline_id>.json
-  jobs/<render_id>.json
+    metadata.json                # includes project_id ownership
+  timelines/<timeline_id>.json   # includes project_id and authorization snapshot
+  jobs/<render_id>.json          # includes project_id
   renders/<render_id>/
     output.wav
-    receipt.json
+    receipt.json                 # explains each source's authorization basis
+  legacy/adoption-*.json         # durable legacy ownership adoption manifests
   tmp/
 ```
 
@@ -170,12 +241,13 @@ by rename.
 ```text
 cmd/voiceservice/       service entry point
 cmd/timelinecheck/      workflow execution entry point
-internal/httpapi/       routing, request limits, JSON errors, media response
+internal/authz/         project membership, role, and grant permission guard
+internal/httpapi/       routing, identity headers, request limits, JSON errors
 internal/service/       workflow orchestration and idempotency
-internal/domain/        entities, validation, errors, and render transitions
+internal/domain/        entities, ownership, validation, errors, transitions
 internal/audiocodec/    WAV handling, transforms, and signal measurement
 internal/render/        timeline preparation, mixing, normalization, receipt
-internal/storage/       atomic local repository
+internal/storage/       atomic local repository and legacy adoption
 internal/checkflow/     bounded production workflow checks
 ```
 
@@ -187,11 +259,18 @@ Run each declared production check from the repository root:
 go run ./cmd/timelinecheck -workflow ingest-audio-source
 go run ./cmd/timelinecheck -workflow compose-timeline
 go run ./cmd/timelinecheck -workflow render-mixdown
+go run ./cmd/timelinecheck -workflow project-isolation
+go run ./cmd/timelinecheck -workflow cross-project-grant
+go run ./cmd/timelinecheck -workflow grant-revocation-race
+go run ./cmd/timelinecheck -workflow legacy-adoption
 ```
 
 Each check creates an isolated temporary data directory, starts the real HTTP
-handler, sends generated WAV inputs, and verifies read-back or rendered output.
-The checks are bounded and do not require network access.
+handler, sends generated WAV inputs, and verifies read-back or rendered
+output. The security checks additionally exercise role enforcement,
+not-found-equivalent cross-project access, grant-based rendering, a
+deterministic revocation-vs-publication interleaving, and legacy adoption. The
+checks are bounded and do not require network access.
 
 ## Deferred test boundary
 

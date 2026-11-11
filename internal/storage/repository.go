@@ -16,7 +16,7 @@ func NewRepository(root string) (*Repository, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, child := range []string{"sources", "timelines", "jobs", "renders", "tmp"} {
+	for _, child := range []string{"sources", "timelines", "jobs", "renders", "projects", "grants", "legacy", "tmp"} {
 		if err := os.MkdirAll(filepath.Join(absolute, child), 0o750); err != nil {
 			return nil, err
 		}

@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"voice-timeline-renderer/internal/authz"
 	"voice-timeline-renderer/internal/httpapi"
 	"voice-timeline-renderer/internal/service"
 	"voice-timeline-renderer/internal/storage"
@@ -30,7 +31,8 @@ func main() {
 		slog.Error("cannot initialize repository", "error", err)
 		os.Exit(1)
 	}
-	serviceLayer := service.New(repo, service.DefaultConfig())
+	guard := authz.NewGuard(repo)
+	serviceLayer := service.New(repo, guard, service.DefaultConfig())
 	api := httpapi.New(serviceLayer, httpapi.Options{
 		MaxSourceRequestBytes: 48 << 20,
 		MaxJSONBytes:          2 << 20,

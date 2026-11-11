@@ -12,7 +12,7 @@ func (server *Server) handleTimelineWrite(w http.ResponseWriter, request *http.R
 		writeError(w, err, nil)
 		return
 	}
-	plan, created, err := server.service.CreateTimeline(request.Context(), request.PathValue("id"), payload)
+	plan, created, err := server.service.CreateTimeline(request.Context(), principalFromHeaders(request), request.PathValue("id"), payload)
 	if err != nil {
 		writeError(w, err, nil)
 		return
@@ -25,7 +25,7 @@ func (server *Server) handleTimelineWrite(w http.ResponseWriter, request *http.R
 }
 
 func (server *Server) handleTimelineRead(w http.ResponseWriter, request *http.Request) {
-	plan, err := server.service.GetTimeline(request.Context(), request.PathValue("id"))
+	plan, err := server.service.GetTimeline(request.Context(), principalFromHeaders(request), request.PathValue("id"))
 	if err != nil {
 		writeError(w, err, nil)
 		return

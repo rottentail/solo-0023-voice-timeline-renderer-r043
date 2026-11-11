@@ -18,6 +18,22 @@
     {
       "workflow_id": "render-mixdown",
       "command": "go run ./cmd/timelinecheck -workflow render-mixdown"
+    },
+    {
+      "workflow_id": "project-isolation",
+      "command": "go run ./cmd/timelinecheck -workflow project-isolation"
+    },
+    {
+      "workflow_id": "cross-project-grant",
+      "command": "go run ./cmd/timelinecheck -workflow cross-project-grant"
+    },
+    {
+      "workflow_id": "grant-revocation-race",
+      "command": "go run ./cmd/timelinecheck -workflow grant-revocation-race"
+    },
+    {
+      "workflow_id": "legacy-adoption",
+      "command": "go run ./cmd/timelinecheck -workflow legacy-adoption"
     }
   ]
 }

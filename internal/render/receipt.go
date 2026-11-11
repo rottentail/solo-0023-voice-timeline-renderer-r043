@@ -16,6 +16,8 @@ func buildReceipt(
 	encoded []byte,
 	normalized normalizationResult,
 	spans []preparedSpan,
+	projectID string,
+	authorizations []domain.SourceAuthorization,
 	now time.Time,
 ) (domain.RenderReceipt, domain.OutputAsset, error) {
 	decoded, info, err := audiocodec.DecodeWAV(encoded)
@@ -43,6 +45,8 @@ func buildReceipt(
 			Index:            span.Index,
 			SourceID:         span.SourceID,
 			SourceDigest:     span.SourceDigest,
+			SourceProjectID:  span.SourceProjectID,
+			Authorization:    span.Authorization,
 			SourceStartFrame: span.SourceStartFrame,
 			SourceEndFrame:   span.SourceEndFrame,
 			OutputStartFrame: span.OutputStartFrame,
@@ -57,8 +61,9 @@ func buildReceipt(
 		}
 	}
 	receipt := domain.RenderReceipt{
-		SchemaVersion: 1,
+		SchemaVersion: 2,
 		RenderID:      renderID,
+		ProjectID:     projectID,
 		TimelineID:    plan.ID,
 		Output:        output,
 		Normalization: domain.NormalizationReceipt{
@@ -67,9 +72,10 @@ func buildReceipt(
 			AppliedGainDB:     normalized.GainDB,
 			OutputPeakDBFS:    measurements.PeakDBFS,
 		},
-		Spans:     receiptSpans,
-		Warnings:  warnings,
-		CreatedAt: now.UTC(),
+		Spans:                receiptSpans,
+		SourceAuthorizations: append([]domain.SourceAuthorization(nil), authorizations...),
+		Warnings:             warnings,
+		CreatedAt:            now.UTC(),
 	}
 	return receipt, output, nil
 }

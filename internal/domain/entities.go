@@ -4,6 +4,7 @@ import "time"
 
 type SourceAsset struct {
 	ID            string    `json:"id"`
+	ProjectID     string    `json:"project_id"`
 	Name          string    `json:"name"`
 	Digest        string    `json:"digest"`
 	ByteCount     int64     `json:"byte_count"`
@@ -27,14 +28,19 @@ type TimelineSpan struct {
 
 type Timeline struct {
 	ID             string         `json:"id"`
+	ProjectID      string         `json:"project_id"`
 	Name           string         `json:"name"`
 	SampleRate     int            `json:"sample_rate"`
 	OutputChannels int            `json:"output_channels"`
 	TargetPeakDBFS float64        `json:"target_peak_dbfs"`
 	Spans          []TimelineSpan `json:"spans"`
-	State          string         `json:"state"`
-	OutputFrames   int64          `json:"output_frames"`
-	CreatedAt      time.Time      `json:"created_at"`
+	// SourceAuthorizations is the permission snapshot captured at composition
+	// time. Rendering re-resolves every source through the same guard and
+	// re-verifies these bases immediately before publishing artifacts.
+	SourceAuthorizations []SourceAuthorization `json:"source_authorizations"`
+	State                string                `json:"state"`
+	OutputFrames         int64                 `json:"output_frames"`
+	CreatedAt            time.Time             `json:"created_at"`
 }
 
 type RenderState string
@@ -61,6 +67,7 @@ type OutputAsset struct {
 
 type RenderJob struct {
 	ID            string       `json:"id"`
+	ProjectID     string       `json:"project_id"`
 	TimelineID    string       `json:"timeline_id"`
 	State         RenderState  `json:"state"`
 	Error         *ErrorDetail `json:"error,omitempty"`
@@ -71,17 +78,19 @@ type RenderJob struct {
 }
 
 type ReceiptSpan struct {
-	Index            int     `json:"index"`
-	SourceID         string  `json:"source_id"`
-	SourceDigest     string  `json:"source_digest"`
-	SourceStartFrame int64   `json:"source_start_frame"`
-	SourceEndFrame   int64   `json:"source_end_frame"`
-	OutputStartFrame int64   `json:"output_start_frame"`
-	OutputEndFrame   int64   `json:"output_end_frame"`
-	OutputFrames     int64   `json:"output_frames"`
-	CrossfadeFrames  int64   `json:"crossfade_frames"`
-	GainDB           float64 `json:"gain_db"`
-	ChannelAction    string  `json:"channel_action"`
+	Index            int                 `json:"index"`
+	SourceID         string              `json:"source_id"`
+	SourceDigest     string              `json:"source_digest"`
+	SourceProjectID  string              `json:"source_project_id"`
+	Authorization    SourceAuthorization `json:"authorization"`
+	SourceStartFrame int64               `json:"source_start_frame"`
+	SourceEndFrame   int64               `json:"source_end_frame"`
+	OutputStartFrame int64               `json:"output_start_frame"`
+	OutputEndFrame   int64               `json:"output_end_frame"`
+	OutputFrames     int64               `json:"output_frames"`
+	CrossfadeFrames  int64               `json:"crossfade_frames"`
+	GainDB           float64             `json:"gain_db"`
+	ChannelAction    string              `json:"channel_action"`
 }
 
 type NormalizationReceipt struct {
@@ -92,14 +101,16 @@ type NormalizationReceipt struct {
 }
 
 type RenderReceipt struct {
-	SchemaVersion int                  `json:"schema_version"`
-	RenderID      string               `json:"render_id"`
-	TimelineID    string               `json:"timeline_id"`
-	Output        OutputAsset          `json:"output"`
-	Normalization NormalizationReceipt `json:"normalization"`
-	Spans         []ReceiptSpan        `json:"spans"`
-	Warnings      []string             `json:"warnings"`
-	CreatedAt     time.Time            `json:"created_at"`
+	SchemaVersion        int                   `json:"schema_version"`
+	RenderID             string                `json:"render_id"`
+	ProjectID            string                `json:"project_id"`
+	TimelineID           string                `json:"timeline_id"`
+	Output               OutputAsset           `json:"output"`
+	Normalization        NormalizationReceipt  `json:"normalization"`
+	Spans                []ReceiptSpan         `json:"spans"`
+	SourceAuthorizations []SourceAuthorization `json:"source_authorizations"`
+	Warnings             []string              `json:"warnings"`
+	CreatedAt            time.Time             `json:"created_at"`
 }
 
 func ValidRenderTransition(from, to RenderState) bool {

@@ -16,7 +16,7 @@ func (server *Server) handleSourceWrite(w http.ResponseWriter, request *http.Req
 		writeError(w, err, nil)
 		return
 	}
-	asset, created, err := server.service.CreateSource(request.Context(), request.PathValue("id"), payload)
+	asset, created, err := server.service.CreateSource(request.Context(), principalFromHeaders(request), request.PathValue("id"), payload)
 	if err != nil {
 		writeError(w, err, nil)
 		return
@@ -29,7 +29,7 @@ func (server *Server) handleSourceWrite(w http.ResponseWriter, request *http.Req
 }
 
 func (server *Server) handleSourceRead(w http.ResponseWriter, request *http.Request) {
-	asset, err := server.service.GetSource(request.Context(), request.PathValue("id"))
+	asset, err := server.service.GetSource(request.Context(), principalFromHeaders(request), request.PathValue("id"))
 	if err != nil {
 		writeError(w, err, nil)
 		return

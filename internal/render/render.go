@@ -25,6 +25,8 @@ func Render(
 	plan domain.Timeline,
 	sources map[string]SourceInput,
 	limits Limits,
+	projectID string,
+	authorizations []domain.SourceAuthorization,
 	now time.Time,
 ) (Result, error) {
 	spans, totalFrames, err := prepareSpans(ctx, plan, sources)
@@ -46,7 +48,7 @@ func Render(
 	if err != nil {
 		return Result{}, err
 	}
-	receipt, output, err := buildReceipt(renderID, plan, encoded, normalized, spans, now)
+	receipt, output, err := buildReceipt(renderID, plan, encoded, normalized, spans, projectID, authorizations, now)
 	if err != nil {
 		return Result{}, err
 	}

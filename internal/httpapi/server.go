@@ -39,6 +39,24 @@ func (server *Server) Handler() http.Handler {
 
 func (server *Server) routes() {
 	server.router.HandleFunc("GET /healthz", server.handleHealth)
+
+	// Project and membership administration.
+	server.router.HandleFunc("PUT /v1/projects/{id}", server.handleProjectWrite)
+	server.router.HandleFunc("GET /v1/projects", server.handleProjectList)
+	server.router.HandleFunc("PUT /v1/memberships", server.handleMembershipWrite)
+	server.router.HandleFunc("GET /v1/memberships/self", server.handleMembershipRead)
+
+	// Cross-project read-only source grants.
+	server.router.HandleFunc("PUT /v1/grants", server.handleGrantWrite)
+	server.router.HandleFunc("GET /v1/grants", server.handleGrantList)
+	server.router.HandleFunc("GET /v1/grants/{id}", server.handleGrantRead)
+	server.router.HandleFunc("POST /v1/grants/{id}/revoke", server.handleGrantRevoke)
+
+	// Legacy ownership migration.
+	server.router.HandleFunc("GET /v1/legacy", server.handleLegacyList)
+	server.router.HandleFunc("POST /v1/legacy/adopt", server.handleLegacyAdopt)
+
+	// Project-scoped media workflows.
 	server.router.HandleFunc("PUT /v1/sources/{id}", server.handleSourceWrite)
 	server.router.HandleFunc("GET /v1/sources/{id}", server.handleSourceRead)
 	server.router.HandleFunc("PUT /v1/timelines/{id}", server.handleTimelineWrite)

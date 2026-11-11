@@ -7,17 +7,22 @@
     {
       "id": "httpapi",
       "path": "internal/httpapi",
-      "responsibility": "Public HTTP routes, request limits, JSON errors, and media responses."
+      "responsibility": "Public HTTP routes, identity headers, request limits, JSON errors, and media responses."
+    },
+    {
+      "id": "authz",
+      "path": "internal/authz",
+      "responsibility": "Single permission authority for project membership, roles, grant resolution, and the render publication gate."
     },
     {
       "id": "service",
       "path": "internal/service",
-      "responsibility": "Workflow orchestration and render lifecycle coordination."
+      "responsibility": "Workflow orchestration, permission-aware resource resolution, grants, legacy adoption, and render lifecycle."
     },
     {
       "id": "domain",
       "path": "internal/domain",
-      "responsibility": "Entities, validation rules, stable errors, and state transitions."
+      "responsibility": "Entities, project ownership, grants, validation rules, stable errors, and state transitions."
     },
     {
       "id": "audiocodec",
@@ -27,12 +32,12 @@
     {
       "id": "render",
       "path": "internal/render",
-      "responsibility": "Timeline evaluation, crossfade mixing, normalization, and receipts."
+      "responsibility": "Timeline evaluation, crossfade mixing, normalization, and authorization-aware receipts."
     },
     {
       "id": "storage",
       "path": "internal/storage",
-      "responsibility": "Concurrent-safe atomic persistence for media and metadata."
+      "responsibility": "Concurrent-safe atomic persistence for projects, grants, media, metadata, and legacy adoption."
     }
   ],
   "complexity": {
@@ -40,7 +45,11 @@
       "state_transition",
       "error_propagation",
       "resource_lifecycle",
-      "concurrency"
+      "concurrency",
+      "permission_enforcement",
+      "cross_project_grant",
+      "publication_gate",
+      "data_migration"
     ]
   },
   "workflows": [
@@ -101,6 +110,87 @@
         "domain",
         "audiocodec",
         "render",
+        "storage"
+      ]
+    },
+    {
+      "id": "project-isolation",
+      "name": "Enforce project isolation and roles",
+      "entry": "GET /v1/sources/{source_id} and project-scoped routes",
+      "steps": [
+        "Resolve membership and role through the authorization guard",
+        "Deny cross-project reads and references with not-found responses",
+        "Block viewer writes while allowing viewer reads"
+      ],
+      "success": "Only project members access project objects; roles limit writes.",
+      "failure": "Cross-project object existence leaks or a role boundary is bypassed.",
+      "verification": "The workflow check asserts not-found equivalence, non-member rejection, and viewer write denial.",
+      "module_ids": [
+        "httpapi",
+        "authz",
+        "service",
+        "domain",
+        "storage"
+      ]
+    },
+    {
+      "id": "cross-project-grant",
+      "name": "Grant read-only cross-project source use",
+      "entry": "PUT /v1/grants then grantee timeline and render routes",
+      "steps": [
+        "Owner issues a read-only grant over an owned source",
+        "Grantee reads the source and renders it in its own project",
+        "Receipt records the grant authorization basis without a mutation path"
+      ],
+      "success": "The grantee consumes the source legally while source facts stay owner-controlled.",
+      "failure": "The grantee can mutate the source, or a third project gains access.",
+      "verification": "The workflow check renders through the grant and asserts the receipt basis and third-party isolation.",
+      "module_ids": [
+        "httpapi",
+        "authz",
+        "service",
+        "domain",
+        "render",
+        "storage"
+      ]
+    },
+    {
+      "id": "grant-revocation-race",
+      "name": "Revoke grants against in-progress renders",
+      "entry": "POST /v1/grants/{id}/revoke versus PUT /v1/renders/{render_id}",
+      "steps": [
+        "Re-verify every authorization basis immediately before publishing",
+        "Fail renders whose grant was withdrawn and publish no artifact",
+        "Keep completed receipts explaining the basis legal at their time"
+      ],
+      "success": "No post-revocation artifact is published; historical artifacts stay explainable.",
+      "failure": "A render commits after its grant was revoked, or historical receipts lose their basis.",
+      "verification": "The workflow check uses a deterministic pre-finalize hook plus post-revocation requests.",
+      "module_ids": [
+        "authz",
+        "service",
+        "domain",
+        "render",
+        "storage"
+      ]
+    },
+    {
+      "id": "legacy-adoption",
+      "name": "Adopt pre-isolation data into a project",
+      "entry": "GET /v1/legacy and POST /v1/legacy/adopt",
+      "steps": [
+        "Enumerate records lacking project ownership",
+        "Stamp one project's ownership and write an adoption manifest",
+        "Backfill historical receipts and leave owned records untouched"
+      ],
+      "success": "Adopted records are usable by their new project; unadopted records stay invisible.",
+      "failure": "Legacy data is reachable through a separate permission path or owned data is reassigned.",
+      "verification": "The workflow check stages unowned records, adopts them, and verifies rendering and second-adoption no-op.",
+      "module_ids": [
+        "httpapi",
+        "authz",
+        "service",
+        "domain",
         "storage"
       ]
     }

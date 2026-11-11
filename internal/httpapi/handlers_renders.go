@@ -13,7 +13,7 @@ func (server *Server) handleRenderWrite(w http.ResponseWriter, request *http.Req
 		writeError(w, err, nil)
 		return
 	}
-	job, created, err := server.service.CreateRender(request.Context(), request.PathValue("id"), payload)
+	job, created, err := server.service.CreateRender(request.Context(), principalFromHeaders(request), request.PathValue("id"), payload)
 	if err != nil {
 		writeError(w, err, &job)
 		return
@@ -26,7 +26,7 @@ func (server *Server) handleRenderWrite(w http.ResponseWriter, request *http.Req
 }
 
 func (server *Server) handleRenderRead(w http.ResponseWriter, request *http.Request) {
-	job, err := server.service.GetRender(request.Context(), request.PathValue("id"))
+	job, err := server.service.GetRender(request.Context(), principalFromHeaders(request), request.PathValue("id"))
 	if err != nil {
 		writeError(w, err, nil)
 		return
@@ -35,7 +35,7 @@ func (server *Server) handleRenderRead(w http.ResponseWriter, request *http.Requ
 }
 
 func (server *Server) handleReceiptRead(w http.ResponseWriter, request *http.Request) {
-	receipt, err := server.service.GetReceipt(request.Context(), request.PathValue("id"))
+	receipt, err := server.service.GetReceipt(request.Context(), principalFromHeaders(request), request.PathValue("id"))
 	if err != nil {
 		writeError(w, err, nil)
 		return
@@ -44,7 +44,7 @@ func (server *Server) handleReceiptRead(w http.ResponseWriter, request *http.Req
 }
 
 func (server *Server) handleOutputRead(w http.ResponseWriter, request *http.Request) {
-	payload, receipt, err := server.service.GetOutput(request.Context(), request.PathValue("id"))
+	payload, receipt, err := server.service.GetOutput(request.Context(), principalFromHeaders(request), request.PathValue("id"))
 	if err != nil {
 		writeError(w, err, nil)
 		return

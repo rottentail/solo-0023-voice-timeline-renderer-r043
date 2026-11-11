@@ -9,13 +9,17 @@ import (
 	"time"
 
 	"voice-timeline-renderer/internal/audiocodec"
+	"voice-timeline-renderer/internal/authz"
 	"voice-timeline-renderer/internal/domain"
 )
 
-func (s *Service) CreateSource(ctx context.Context, id string, request SourceWriteRequest) (domain.SourceAsset, bool, error) {
+func (s *Service) CreateSource(ctx context.Context, principal authz.Principal, id string, request SourceWriteRequest) (domain.SourceAsset, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := ctx.Err(); err != nil {
+		return domain.SourceAsset{}, false, err
+	}
+	if _, err := s.guard.RequireRole(principal, domain.RoleEditor); err != nil {
 		return domain.SourceAsset{}, false, err
 	}
 	if err := domain.ValidateResourceID("source_id", id); err != nil {
@@ -37,6 +41,11 @@ func (s *Service) CreateSource(ctx context.Context, id string, request SourceWri
 
 	existing, getErr := s.repo.GetSourceMeta(id)
 	if getErr == nil {
+		// An existing identifier in another project behaves as not-found: IDs
+		// are globally unique, but cross-project existence must not leak.
+		if existing.ProjectID != principal.ProjectID {
+			return domain.SourceAsset{}, false, domain.E(domain.KindNotFound, "source_not_found", "source_id", "source does not exist or is not accessible to the project")
+		}
 		if existing.Digest != digest || existing.Name != request.Name {
 			return domain.SourceAsset{}, false, domain.E(domain.KindConflict, "source_conflict", "source_id", "identifier is already bound to different source content")
 		}
@@ -67,6 +76,7 @@ func (s *Service) CreateSource(ctx context.Context, id string, request SourceWri
 	measurements := audiocodec.Measure(clip.Samples)
 	asset := domain.SourceAsset{
 		ID:            id,
+		ProjectID:     principal.ProjectID,
 		Name:          request.Name,
 		Digest:        digest,
 		ByteCount:     info.ByteCount,

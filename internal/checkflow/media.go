@@ -1,10 +1,22 @@
 package checkflow
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"math"
 
 	"voice-timeline-renderer/internal/audiocodec"
 )
+
+func encodeBase64(payload []byte) string {
+	return base64.StdEncoding.EncodeToString(payload)
+}
+
+func digestHex(payload []byte) string {
+	digest := sha256.Sum256(payload)
+	return hex.EncodeToString(digest[:])
+}
 
 func sineWAV(sampleRate, channels, durationMS int, frequency, amplitude float64) ([]byte, error) {
 	frames := sampleRate * durationMS / 1000

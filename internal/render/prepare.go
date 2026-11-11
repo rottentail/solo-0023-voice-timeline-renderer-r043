@@ -9,14 +9,17 @@ import (
 )
 
 type SourceInput struct {
-	Asset domain.SourceAsset
-	WAV   []byte
+	Asset         domain.SourceAsset
+	WAV           []byte
+	Authorization domain.SourceAuthorization
 }
 
 type preparedSpan struct {
 	Index            int
 	SourceID         string
 	SourceDigest     string
+	SourceProjectID  string
+	Authorization    domain.SourceAuthorization
 	SourceStartFrame int64
 	SourceEndFrame   int64
 	OutputStartFrame int64
@@ -81,6 +84,8 @@ func prepareSpans(
 			Index:            index,
 			SourceID:         span.SourceID,
 			SourceDigest:     source.Asset.Digest,
+			SourceProjectID:  source.Asset.ProjectID,
+			Authorization:    source.Authorization,
 			SourceStartFrame: span.SourceStartFrame,
 			SourceEndFrame:   span.SourceEndFrame,
 			OutputStartFrame: start,
